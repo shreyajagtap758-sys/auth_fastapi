@@ -7,10 +7,13 @@ from fastapi.exceptions import HTTPException
 from .utils import create_access_token, decode_token, verify_password
 from datetime import timedelta, datetime
 from fastapi.responses import JSONResponse
-from .dependencies import refreshtokenbearer
+from .dependencies import refreshtokenbearer, accesstokenbearer, get_current_user, rolechecker
+from src.db.redis import add_jti_to_blocklist
 
 auth_router = APIRouter() # route for auth file
 user_service = UserService()  # userservice() from service file to use here
+role_checker = Depends(rolechecker(['admin', "user"]))
+
 
 REFRESH_TOKEN_EXPIRY=True
 
@@ -50,7 +53,8 @@ async def login_users(
             access_token = create_access_token(
                 user_data={
                     'email': user.email,
-                    'user_uid': str(user.uid)
+                    'user_uid': str(user.uid),
+                    "role": user.role
                 }
             )
             refresh_token = create_access_token(
@@ -94,3 +98,21 @@ async def get_new_access(token_detail : dict= Depends(refreshtokenbearer())):
         })
 
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="expired token") # if token expired, user must login again
+
+@auth_router.get('/me')
+async def get_current_user(user = Depends(get_current_user), : bool=Depends(role_checker)):
+    return user
+
+@auth_router.get('/logout')
+async def revoke_token(token_details: dict=Depends(accesstokenbearer())):
+
+    jti = token_details['jti']
+
+    await add_jti_to_blocklist(jti)
+
+    return JSONResponse(
+        content={
+            "message": "logged out successfully"
+        },
+        status_code=status.HTTP_200_OK
+    )

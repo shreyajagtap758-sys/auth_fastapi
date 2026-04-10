@@ -1,10 +1,10 @@
 from passlib.context import CryptContext  # password hash algorithm manager
 from datetime import datetime, timedelta  # timedelta= duration used for expiry token
 from src.config import Config
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 
 import uuid
-import logging  # error logging, detailed error dega
+import logging
 
 passwd_context = CryptContext(schemes=["argon2"])  #argon2 is hashing algorithm using cryptcontext manager
 
@@ -48,7 +48,9 @@ def decode_token(token: str) -> dict:  #ab client decoded token ko bhejega, ab u
         )
 
         return token_data    #toke valid- dict return(dict me whi key jo encode me thi)
-# jwterror library, exc_info e exact info print krega
-    except JWTError as e:
-        logging.exception("token decode fail", exc_info=e)
-        return None  # invalid toh return none krega
+
+    except ExpiredSignatureError:  # ye ya fir
+        logging.exception("Token expired")
+
+    except JWTError:  # ye
+        logging.exception("Invalid token")

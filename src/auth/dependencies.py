@@ -1,8 +1,16 @@
 
 #bearer scheme ka naam, <token> actual token, http reuest me berear token check krta
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, Depends
 from .utils import decode_token   # utility func, jwt verify krke payload return krta
+from src.db.redis import token_in_blockedlist
+from sqlmodel.ext.asyncio.session import AsyncSession
+from src.db.database import get_session
+from .service import UserService
+from typing import List, Any
+from .models import User
+
+user_service = UserService()
 
 class tokenbearer(HTTPBearer):
 
@@ -15,10 +23,26 @@ class tokenbearer(HTTPBearer):
         token = creds.credentials
         token_data = decode_token(token)
 
+        token = creds.credentials.strip()
+
+        if " " in token:
+            print("⚠️ Token contains spaces:", token)
+
+        if token.count(".") != 2:
+            print("❌ Invalid JWT format:", token)
+
         if not token_data:
             raise HTTPException(
                 status_code=403,
-                detail="invalid/expired token"
+                detail={"error" : "invalid/expired token",
+                        "resolution": "get new access token"}
+            )
+
+        if await token_in_blockedlist(token_data['jti']):
+            raise HTTPException(
+                status_code=403,
+                detail={"error" : "invalid token/revoked",
+                "resolution": "please get new token"}
             )
 
         self.verify_token_data(token_data)
@@ -42,8 +66,31 @@ class accesstokenbearer(tokenbearer):     #child class of tokenbearer class
 class refreshtokenbearer(tokenbearer):  # child class of token bearer
     def verify_token_data(self, token_data: dict) -> None:
         # if token data(not none) and token data is NOT refresh_token = error
-        if token_data and not token_data['refresh']:
+        if token_data and token_data['access']:
             raise HTTPException(
                 status_code=403,  # user agar refresh token bheje to error
                 detail="please provide an refresh token, not access"
             )
+
+async def get_current_user(
+    token_details: dict=Depends(accesstokenbearer()),
+    session: AsyncSession= Depends(get_session)
+):
+    user_email = token_details["user"]["email"]
+
+    user = await user_service.get_user_by_email(user_email, session)
+    return user
+
+class rolechecker:
+    def __init__(self, allowed_roles: List[str]) -> None:
+
+        self.allowed_roles = allowed_roles
+
+    def __call__(self, current_user: User= Depends(get_current_user)) -> Any:
+        if current_user.role in self.allowed_roles:
+            return True
+
+        raise HTTPException(
+            status_code=403,
+            detail="you are not allowed to perform this action"
+        )

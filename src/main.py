@@ -18,8 +18,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Bookly API",
     description="A REST API for managing books",
-    version="v1",
-    lifespan=lifespan
+    version="v1"
 )
 
 # ✅ Router include (prefix + tags)

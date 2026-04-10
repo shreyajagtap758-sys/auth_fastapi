@@ -6,18 +6,21 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.database import engine
 from sqlalchemy.future import select   # sqlalchemy select works better with async
 from src.books.models import Book
-from src.auth.dependencies import accesstokenbearer
+from src.auth.dependencies import accesstokenbearer, rolechecker
+
+
 
 books_router = APIRouter(prefix="/books", tags=["books"])
 service = BookService()
 access_token_bearer = accesstokenbearer()  # token ko validate krke token data yaha use kr sakte
+role_checker = rolechecker()
 
 async def get_session():
     async with AsyncSession(engine) as session:
         yield session
 
 
-@books_router.get("/")
+@books_router.get("/", dependencies=[role_checker])
 async def get_book(
         limit: int = 10,
         offset: int = 0,
@@ -29,7 +32,7 @@ async def get_book(
     )
     return result.scalars().all()
 
-@books_router.get("/search")
+@books_router.get("/search", dependencies=[role_checker])
 async def search_books(
         min_price: float = 0,
         session: AsyncSession = Depends(get_session),
@@ -43,7 +46,7 @@ async def search_books(
 
 # GET BY ID
 
-@books_router.get("/{book_id}")
+@books_router.get("/{book_id}", dependencies=[role_checker])
 async def get_book(book_id: UUID, session: AsyncSession = Depends(get_session),
                    user_details=Depends(access_token_bearer)):
     book = await service.get_book(book_id, session)
@@ -53,7 +56,7 @@ async def get_book(book_id: UUID, session: AsyncSession = Depends(get_session),
 
 
 # CREATE
-@books_router.post("/")
+@books_router.post("/", dependencies=[role_checker])
 async def create_book(
         data: BookCreate,
         session: AsyncSession = Depends(get_session),
@@ -62,7 +65,7 @@ async def create_book(
     return await service.create_book(data, session)
 
 # UPDATE
-@books_router.put("/{book_id}")
+@books_router.put("/{book_id}", dependencies=[role_checker])
 async def update_book(
         book_id: UUID,
         data: BookUpdate,
@@ -76,7 +79,7 @@ async def update_book(
 
 # DELETE
 
-@books_router.delete("/{book_id}")
+@books_router.delete("/{book_id}", dependencies=[role_checker])
 async def delete_book(
         book_id: UUID,
         session: AsyncSession = Depends(get_session),
@@ -87,5 +90,3 @@ async def delete_book(
         raise HTTPException(status_code=404, detail="Book not found")
     return {"message": "Book deleted successfully"}
 
-
-# FILTER
