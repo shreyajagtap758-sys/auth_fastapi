@@ -1,42 +1,41 @@
 from fastapi import APIRouter, Depends, HTTPException
 from uuid import UUID
-from src.books.schemas import BookCreate, BookUpdate
+from src.books.schemas import BookCreate, BookUpdate, BookDetailModel
 from src.books.service import BookService
 from sqlmodel.ext.asyncio.session import AsyncSession
-from src.db.database import engine
 from sqlalchemy.future import select   # sqlalchemy select works better with async
-from src.books.models import Book
+from src.models import Book
 from src.auth.dependencies import accesstokenbearer, rolechecker
-
-
+from src.db.database import get_session
 
 books_router = APIRouter(prefix="/books", tags=["books"])
 service = BookService()
 access_token_bearer = accesstokenbearer()  # token ko validate krke token data yaha use kr sakte
-role_checker = rolechecker()
-
-async def get_session():
-    async with AsyncSession(engine) as session:
-        yield session
-
+role_checker = Depends(rolechecker(['admin', "user"]))
 
 @books_router.get("/", dependencies=[role_checker])
-async def get_book(
-        limit: int = 10,
-        offset: int = 0,
-        session: AsyncSession = Depends(get_session),
-        user_details=Depends(access_token_bearer)  # token read
-):     # user detail accestokenbearer call ko execute krta, header se token niklke verify- valid hua to return krega toen_data in userr_data
-    result = await session.exec(
-        select(Book).offset(offset).limit(limit)
-    )
-    return result.scalars().all()
+async def get_books(
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer)
+):
+    books = await service.get_all_books(session)
+    return books
+
+@books_router.get("/user/{user_uid}", dependencies=[role_checker])
+async def get_user_submissions(
+    user_uid : str,
+    session: AsyncSession = Depends(get_session),
+    token_details: dict = Depends(access_token_bearer)
+):
+    books = await service.get_users_books(user_uid, session)
+    return books
+
 
 @books_router.get("/search", dependencies=[role_checker])
 async def search_books(
         min_price: float = 0,
         session: AsyncSession = Depends(get_session),
-        user_details=Depends(access_token_bearer)
+        token_details : dict =Depends(access_token_bearer)
 ):
     result = await session.exec(
         select(Book).where(Book.price >= min_price)
@@ -46,12 +45,14 @@ async def search_books(
 
 # GET BY ID
 
-@books_router.get("/{book_id}", dependencies=[role_checker])
-async def get_book(book_id: UUID, session: AsyncSession = Depends(get_session),
-                   user_details=Depends(access_token_bearer)):
+@books_router.get("/{book_id}",response_model = BookDetailModel ,dependencies=[role_checker])
+async def get_a_book(book_id: UUID, session: AsyncSession = Depends(get_session),
+                   token_details : dict =Depends(access_token_bearer)) -> dict:
     book = await service.get_book(book_id, session)
+
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
+
     return book
 
 
@@ -60,9 +61,11 @@ async def get_book(book_id: UUID, session: AsyncSession = Depends(get_session),
 async def create_book(
         data: BookCreate,
         session: AsyncSession = Depends(get_session),
-        user_details=Depends(access_token_bearer)
+        token_details : dict =Depends(access_token_bearer)
 ):
-    return await service.create_book(data, session)
+    user_id = token_details.get("user")["user_uid"]
+    new_book = await service.create_book(data, user_id, session)
+    return new_book
 
 # UPDATE
 @books_router.put("/{book_id}", dependencies=[role_checker])
@@ -70,8 +73,10 @@ async def update_book(
         book_id: UUID,
         data: BookUpdate,
         session: AsyncSession = Depends(get_session),
-        user_details=Depends(access_token_bearer)
-):
+        token_details : dict =Depends(access_token_bearer)) -> dict:
+
+    user_id = token_details.get('user')['user_uid']
+
     book = await service.update_book(book_id, data, session)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -83,7 +88,7 @@ async def update_book(
 async def delete_book(
         book_id: UUID,
         session: AsyncSession = Depends(get_session),
-        user_details=Depends(access_token_bearer)
+        token_details : dict =Depends(access_token_bearer)
 ):
     success = await service.delete_book(book_id, session)
     if not success:

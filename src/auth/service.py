@@ -1,4 +1,4 @@
-from .models import User
+from src.models import User
 from .schemas import UserCreateModel
 from .utils import generate_passwd_hash
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -10,7 +10,7 @@ class UserService:
 
         result = await session.execute(statement)
 
-        user = result.scalar()
+        user = result.scalar_one_or_none()
 
         return user
 
@@ -26,7 +26,8 @@ class UserService:
             first_name=user_data_dict['first_name'],
             last_name=user_data_dict['last_name'],
             email=user_data_dict["email"],
-            username=user_data_dict["username"]
+            username=user_data_dict["username"],
+            password=user_data_dict["password"]
         )
 
         new_user.hashed_password = generate_passwd_hash(user_data_dict['password'])

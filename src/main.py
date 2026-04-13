@@ -3,6 +3,15 @@ from contextlib import asynccontextmanager
 from src.db.database import init_db
 from src.books.routes import books_router
 from src.auth.routes import auth_router
+from src.reviews.routes import review_router
+
+app = FastAPI(
+    title="Bookly API",
+    description="A REST API for managing books",
+    version="v1"
+)
+
+from src import models
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -14,11 +23,11 @@ async def lifespan(app: FastAPI):
 
     print("🛑 Server has been stopped")
 
-# ✅ App metadata
-app = FastAPI(
-    title="Bookly API",
-    description="A REST API for managing books",
-    version="v1"
+
+app.include_router(
+    review_router,
+    prefix="/api/v1/reviews",
+    tags=["reviews"]
 )
 
 # ✅ Router include (prefix + tags)

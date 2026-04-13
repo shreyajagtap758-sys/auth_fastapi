@@ -7,14 +7,15 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-from src.auth.models import User  # import out model.py classes so change in code tracked by alembic and it change in db
-from src.books.models import Book     # also this(import all model class)
+from src import models  # import out model.py classes so change in code tracked by alembic and it change in db
+
 from sqlmodel import SQLModel   #
 from src.config import Config   #
 
 database_url = Config.DATABASE_URL    # this gives acces to our api db
 config = context.config
 config.set_main_option("sqlalchemy.url", database_url)   # set main option as our db
+from sqlmodel import SQLModel
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

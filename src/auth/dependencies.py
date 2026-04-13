@@ -8,12 +8,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.database import get_session
 from .service import UserService
 from typing import List, Any
-from .models import User
+from src.models import User
 
 user_service = UserService()
 
 class tokenbearer(HTTPBearer):
-
+# class tokenbearer ko oject ki tar use krne init kiya ,fir uss object ko runkrne call kiya
     def __init__(self, auto_error=True):  # auto error is true means we get error when header is not true, if false manual check ki token heyanai
         super().__init__(auto_error=auto_error)   #call init method of httpbearer
 
@@ -48,12 +48,13 @@ class tokenbearer(HTTPBearer):
         self.verify_token_data(token_data)
 
         return token_data
+
     def verify_token_data(self, token_data):
         raise NotImplementedError("override in child class")
 
 # HTTPBearer + Depends ka combo = clean, reusable dependency jo automatically token provide karega.
 class accesstokenbearer(tokenbearer):     #child class of tokenbearer class
-    # only checks if user sent access token not refresh token
+    # only checks if user sent access token ,not refresh token
 
     def verify_token_data(self, token_data: dict) -> None:
         # if token data(not none) and token data is refresh_token = error
@@ -79,14 +80,20 @@ async def get_current_user(
     user_email = token_details["user"]["email"]
 
     user = await user_service.get_user_by_email(user_email, session)
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
     return user
 
 class rolechecker:
     def __init__(self, allowed_roles: List[str]) -> None:
 
         self.allowed_roles = allowed_roles
-
-    def __call__(self, current_user: User= Depends(get_current_user)) -> Any:
+ # get user from db + token verify from get current user
+    async def __call__(self, current_user: User= Depends(get_current_user)) -> Any:
         if current_user.role in self.allowed_roles:
             return True
 

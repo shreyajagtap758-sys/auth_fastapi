@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, status
-from .schemas import UserCreateModel, UserModel, UserLogicModel
+from .schemas import UserCreateModel, UserModel, UserLogicModel, UserBooks
 from .service import UserService
 from src.db.database import get_session
 from sqlmodel.ext.asyncio.session import AsyncSession
 from fastapi.exceptions import HTTPException
-from .utils import create_access_token, decode_token, verify_password
+from .utils import create_access_token, verify_password
 from datetime import timedelta, datetime
 from fastapi.responses import JSONResponse
 from .dependencies import refreshtokenbearer, accesstokenbearer, get_current_user, rolechecker
@@ -12,7 +12,7 @@ from src.db.redis import add_jti_to_blocklist
 
 auth_router = APIRouter() # route for auth file
 user_service = UserService()  # userservice() from service file to use here
-role_checker = Depends(rolechecker(['admin', "user"]))
+role_checker = rolechecker(['admin', "user"])
 
 
 REFRESH_TOKEN_EXPIRY=True
@@ -99,9 +99,10 @@ async def get_new_access(token_detail : dict= Depends(refreshtokenbearer())):
 
     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="expired token") # if token expired, user must login again
 
-@auth_router.get('/me')
-async def get_current_user(user = Depends(get_current_user), : bool=Depends(role_checker)):
-    return user
+@auth_router.get('/me', response_model=UserBooks)  # user ka token verify, check user role, _ just validation
+async def current_user(user = Depends(get_current_user), _: bool=Depends(role_checker)):
+
+    return {"user" : user, "books" : user.books, "reviews": user.reviews}
 
 @auth_router.get('/logout')
 async def revoke_token(token_details: dict=Depends(accesstokenbearer())):

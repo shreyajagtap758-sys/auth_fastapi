@@ -1,30 +1,45 @@
-from sqlmodel import select
-from src.books.models import Book
+from http.client import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select, desc
+from src.models import Book
 from datetime import datetime
-
+from src.books.schemas import BookUpdate, BookCreate
 
 class BookService:
 
-    async def get_book(self, session):
+    async def get_all_books(self,session: AsyncSession):
         result = await session.execute(select(Book))
         return result.scalars().all()
 
 
-    async def get_book(self, book_id, session):
+    async def get_users_books(self, user_uid : str, session: AsyncSession):
+        statement = select(Book).where(Book.user_uid == user_uid).order_by(desc(Book.author))
+
+        result = await session.execute(statement)
+
+        return result.scalars().all()
+
+
+    async def get_book(self, book_uid : Book, session : AsyncSession):
         result = await session.execute(
-            select(Book).where(Book.id == book_id)
+            select(Book).where(Book.uid == book_uid)
         )
         return result.scalars().one_or_none()
 
-    async def create_book(self, data, session):
-        new_book = Book(**data.model_dump())
+    async def create_book(self, data : BookCreate, user_uid:str, session : AsyncSession):
+        book_data_dict = data.model_dump()
+
+        new_book = Book(**book_data_dict)
+        new_book.user_uid = user_uid
+
         session.add(new_book)
         await session.commit()
         await session.refresh(new_book)
+
         return new_book
 
-    async def update_book(self, book_id, data, session):
-        book = await self.get_book(book_id, session)
+    async def update_book(self, book_uid : Book, data : BookUpdate, session : AsyncSession):
+        book = await self.get_book(book_uid, session)
         if not book:
             return None
 
@@ -39,11 +54,14 @@ class BookService:
         await session.refresh(book)
         return book
 
-    async def delete_book(self, book_id, session):
-        book = await self.get_book(book_id, session)
+    async def delete_book(self, book_uid, session : AsyncSession):
+        book = await self.get_book(book_uid, session)
         if not book:
             return False
 
         await session.delete(book)
         await session.commit()
         return True
+
+
+

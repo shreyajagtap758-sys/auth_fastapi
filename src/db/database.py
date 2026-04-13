@@ -1,3 +1,4 @@
+from sqlalchemy.sql.functions import user
 from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from src.config import Config
