@@ -2,6 +2,8 @@
 #bearer scheme ka naam, <token> actual token, http reuest me berear token check krta
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Request, HTTPException, Depends
+
+from src.exceptions.auth.exceptions import AccountNotVerified
 from .utils import decode_token   # utility func, jwt verify krke payload return krta
 from src.db.redis import token_in_blockedlist
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -9,11 +11,13 @@ from src.db.database import get_session
 from .service import UserService
 from typing import List, Any
 from src.models import User
+from src.exceptions.auth.exceptions import InvalidToken, AccessTokenRequired, RefreshTokenRequired, InsufficientPermission
+
 
 user_service = UserService()
 
 class tokenbearer(HTTPBearer):
-# class tokenbearer ko oject ki tar use krne init kiya ,fir uss object ko runkrne call kiya
+# class tokenbearer ko object ki tar use krne init kiya ,fir uss object ko runkrne call kiya
     def __init__(self, auto_error=True):  # auto error is true means we get error when header is not true, if false manual check ki token heyanai
         super().__init__(auto_error=auto_error)   #call init method of httpbearer
 
@@ -32,18 +36,10 @@ class tokenbearer(HTTPBearer):
             print("❌ Invalid JWT format:", token)
 
         if not token_data:
-            raise HTTPException(
-                status_code=403,
-                detail={"error" : "invalid/expired token",
-                        "resolution": "get new access token"}
-            )
+            raise InvalidToken()
 
         if await token_in_blockedlist(token_data['jti']):
-            raise HTTPException(
-                status_code=403,
-                detail={"error" : "invalid token/revoked",
-                "resolution": "please get new token"}
-            )
+            raise InvalidToken()
 
         self.verify_token_data(token_data)
 
@@ -59,19 +55,13 @@ class accesstokenbearer(tokenbearer):     #child class of tokenbearer class
     def verify_token_data(self, token_data: dict) -> None:
         # if token data(not none) and token data is refresh_token = error
         if token_data and token_data['refresh']:
-            raise HTTPException(
-                status_code=403,  # user agar refresh token bheje to error
-                detail="please provide an access token, not refresh"
-            )
+            raise AccessTokenRequired()
 
 class refreshtokenbearer(tokenbearer):  # child class of token bearer
     def verify_token_data(self, token_data: dict) -> None:
         # if token data(not none) and token data is NOT refresh_token = error
         if token_data and token_data['access']:
-            raise HTTPException(
-                status_code=403,  # user agar refresh token bheje to error
-                detail="please provide an refresh token, not access"
-            )
+            raise RefreshTokenRequired()
 
 async def get_current_user(
     token_details: dict=Depends(accesstokenbearer()),
@@ -94,10 +84,11 @@ class rolechecker:
         self.allowed_roles = allowed_roles
  # get user from db + token verify from get current user
     async def __call__(self, current_user: User= Depends(get_current_user)) -> Any:
+
+        if current_user.is_verified:
+            raise AccountNotVerified()
+
         if current_user.role in self.allowed_roles:
             return True
 
-        raise HTTPException(
-            status_code=403,
-            detail="you are not allowed to perform this action"
-        )
+        raise InsufficientPermission()

@@ -2,10 +2,9 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
 from typing import List
-
-from sqlalchemy import ForeignKey
-
 from src.reviews.schemas import reviewmodel
+from src.tags.schemas import TagModel
+
 
 class BookCreate(BaseModel):
     title: str
@@ -38,7 +37,8 @@ class BookRead(BaseModel):
     pages: int | None = None
     language: str | None = None
     is_available: bool | None = None
+    tags: list[TagModel] = []
 
-class BookDetailModel(BaseModel):
-    books: BookRead
+class BookDetailModel(BookRead):
     reviews: List[reviewmodel]
+

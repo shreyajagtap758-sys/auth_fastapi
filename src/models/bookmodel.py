@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional, List
 import sqlalchemy.dialects.postgresql as pg
 import sqlalchemy as sa
+from src.models import booktaglink
 
 
 class Book(SQLModel, table=True):
@@ -22,6 +23,10 @@ class Book(SQLModel, table=True):
     user : Optional["User"] = Relationship(back_populates="books")  # who submitted a book, for that we fetch user's data from user table
     reviews: List["Review"] = Relationship(back_populates="book",
                                            sa_relationship_kwargs={'lazy': 'selectin'})
+    tags: List["Tag"] = Relationship(
+        back_populates="books",
+        link_model=booktaglink
+    )
 
     language: str
     is_available: bool = True

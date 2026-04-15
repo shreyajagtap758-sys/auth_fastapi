@@ -2,6 +2,7 @@ from passlib.context import CryptContext  # password hash algorithm manager
 from datetime import datetime, timedelta  # timedelta= duration used for expiry token
 from src.config import Config
 from jose import jwt, JWTError, ExpiredSignatureError
+from itsdangerous import URLSafeSerializer
 
 import uuid
 import logging
@@ -54,3 +55,23 @@ def decode_token(token: str) -> dict:  #ab client decoded token ko bhejega, ab u
 
     except JWTError:  # ye
         logging.exception("Invalid token")
+
+serializer = URLSafeSerializer(secret_key=Config.JWT_SECRET)
+
+def create_url_safe_token(data : dict):
+
+    token = serializer.dumps(data, salt="email-confirm")
+
+    return token
+
+def decode_url_safe_token(token:str):
+    try:
+        token_data = serializer.loads(token, salt="email-confirm")
+
+        return token_data
+
+    except Exception as e:
+        print("decode error : ", str(e))
+        return None
+
+

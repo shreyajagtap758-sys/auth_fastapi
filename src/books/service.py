@@ -4,6 +4,7 @@ from sqlmodel import select, desc
 from src.models import Book
 from datetime import datetime
 from src.books.schemas import BookUpdate, BookCreate
+from sqlalchemy.orm import selectinload
 
 class BookService:
 
@@ -20,11 +21,11 @@ class BookService:
         return result.scalars().all()
 
 
-    async def get_book(self, book_uid : Book, session : AsyncSession):
+    async def get_book(self, book_uid : str, session : AsyncSession):
         result = await session.execute(
-            select(Book).where(Book.uid == book_uid)
+            select(Book).options(selectinload(Book.tags)).where(Book.uid == book_uid)
         )
-        return result.scalars().one_or_none()
+        return result.scalar_one_or_none()
 
     async def create_book(self, data : BookCreate, user_uid:str, session : AsyncSession):
         book_data_dict = data.model_dump()
@@ -38,7 +39,7 @@ class BookService:
 
         return new_book
 
-    async def update_book(self, book_uid : Book, data : BookUpdate, session : AsyncSession):
+    async def update_book(self, book_uid : str, data : BookUpdate, session : AsyncSession):
         book = await self.get_book(book_uid, session)
         if not book:
             return None
@@ -54,7 +55,7 @@ class BookService:
         await session.refresh(book)
         return book
 
-    async def delete_book(self, book_uid, session : AsyncSession):
+    async def delete_book(self, book_uid : str, session : AsyncSession):
         book = await self.get_book(book_uid, session)
         if not book:
             return False
@@ -63,5 +64,8 @@ class BookService:
         await session.commit()
         return True
 
+    async def get_book_with_tags(self, book_uid: str, session: AsyncSession):
+        result = await session.execute(select(Book).options(selectinload(Book.tags)).where(Book.uid == book_uid))
 
+        return result.scalar_one_or_none()
 

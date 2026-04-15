@@ -7,6 +7,8 @@ from sqlalchemy.future import select   # sqlalchemy select works better with asy
 from src.models import Book
 from src.auth.dependencies import accesstokenbearer, rolechecker
 from src.db.database import get_session
+from src.exceptions.book.exceptions import BookNotFound
+
 
 books_router = APIRouter(prefix="/books", tags=["books"])
 service = BookService()
@@ -47,11 +49,11 @@ async def search_books(
 
 @books_router.get("/{book_id}",response_model = BookDetailModel ,dependencies=[role_checker])
 async def get_a_book(book_id: UUID, session: AsyncSession = Depends(get_session),
-                   token_details : dict =Depends(access_token_bearer)) -> dict:
+                   token_details : dict =Depends(access_token_bearer)):
     book = await service.get_book(book_id, session)
 
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise BookNotFound()
 
     return book
 
@@ -79,7 +81,7 @@ async def update_book(
 
     book = await service.update_book(book_id, data, session)
     if not book:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise BookNotFound()
     return book
 
 # DELETE
@@ -91,7 +93,8 @@ async def delete_book(
         token_details : dict =Depends(access_token_bearer)
 ):
     success = await service.delete_book(book_id, session)
+
     if not success:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise BookNotFound()
     return {"message": "Book deleted successfully"}
 

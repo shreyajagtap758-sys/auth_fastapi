@@ -3,7 +3,7 @@ from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from src.config import Config
 
-engine = create_async_engine(Config.DATABASE_URL, echo=True)
+engine = create_async_engine(Config.DATABASE_URL)
 
 # ✅ correct async session maker
 AsyncSessionLocal = async_sessionmaker(
